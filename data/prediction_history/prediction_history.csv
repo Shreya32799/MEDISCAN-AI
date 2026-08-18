@@ -1,0 +1,86 @@
+PatientID,PatientName,Disease,Probability,RiskLevel,Prediction,DateTime
+B84520BE,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,16-07-2026 17:27
+14076646,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,16-07-2026 17:33
+3356B2CF,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,16-07-2026 17:33
+F7675B50,,Diabetes,7.95,Low Risk,Healthy,17-07-2026 15:13
+4EA20FA3,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,17-07-2026 15:46
+AFF64330,Pratik patil ,Heart Disease,30.84,Moderate Risk,Healthy,17-07-2026 15:47
+ABDF736B,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,17-07-2026 15:50
+9163FC1E,Pratik Patil,Heart Disease,31.12,Moderate Risk,Healthy,17-07-2026 15:51
+5ABEEF30,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,17-07-2026 16:00
+55CD07DB,pratik patil,Heart Disease,41.31,Moderate Risk,Healthy,17-07-2026 16:02
+90873D49,asadali jamir mujawar ,Diabetes,18.02,Low Risk,Healthy,18-07-2026 13:22
+DB844CA3,,Diabetes,7.95,Low Risk,Healthy,18-07-2026 21:48
+60375097,,Diabetes,7.95,Low Risk,Healthy,18-07-2026 22:33
+FD7F5877,,Diabetes,7.95,Low Risk,Healthy,18-07-2026 23:11
+CF504EDF,,Diabetes,7.95,Low Risk,Healthy,18-07-2026 23:11
+4186F95E,Bhakti Vaghmare,Diabetes,8.74,Low Risk,Healthy,19-07-2026 12:36
+CC82524B,Bhakti Vaghmare,Diabetes,8.74,Low Risk,Healthy,19-07-2026 12:36
+AE96551C,Asadali Jamir Mujawar ,Heart Disease,36.85,Moderate Risk,Healthy,19-07-2026 12:50
+FC6EC8B0,Pratik Patil,Diabetes,8.74,Low Risk,Healthy,19-07-2026 13:10
+566B2DA1,Pratik Patil,Diabetes,8.74,Low Risk,Healthy,19-07-2026 13:10
+3D73B003,Pratik Patil,Diabetes,8.74,Low Risk,Healthy,19-07-2026 13:12
+AC72C7FF,Pratik Patil,Diabetes,8.74,Low Risk,Healthy,19-07-2026 13:13
+C885BEB9,Pratik Patil,Diabetes,8.74,Low Risk,Healthy,19-07-2026 13:22
+C7103A67,Pratik Patil,Diabetes,8.74,Low Risk,Healthy,19-07-2026 13:23
+B64EB164,PRATIK PATIL,Heart Disease,41.31,Moderate Risk,Healthy,19-07-2026 13:26
+EE4D7B5B,Pratik Patil,Diabetes,8.74,Low Risk,Healthy,19-07-2026 13:31
+5FB6BC78,Pratik Patil,Diabetes,8.74,Low Risk,Healthy,19-07-2026 13:34
+F076FC2B,PRATIK PATIL,Heart Disease,41.31,Moderate Risk,Healthy,19-07-2026 13:37
+CAFC54EF,Pratik Patil,Diabetes,8.74,Low Risk,Healthy,19-07-2026 13:42
+22FE5C89,PRATIK PATIL,Heart Disease,41.31,Moderate Risk,Healthy,19-07-2026 13:42
+A73F2C25,Pratik Patil,Diabetes,8.74,Low Risk,Healthy,19-07-2026 13:53
+96C734B4,Bhakti Vaghmare,Diabetes,8.74,Low Risk,Healthy,19-07-2026 13:56
+CAE2011C,Shree Patil,Heart Disease,41.31,Moderate Risk,Healthy,19-07-2026 13:57
+D91BA678,Pratik Patil,Heart Disease,41.31,Moderate Risk,Healthy,19-07-2026 14:03
+B001F2F0,Pratik Patil,Diabetes,8.74,Low Risk,Healthy,19-07-2026 14:11
+EFC9EED2,Pratik Patil,Diabetes,8.74,Low Risk,Healthy,19-07-2026 14:14
+E0461B78,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,19-07-2026 14:16
+5CB277F1,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,19-07-2026 14:16
+E3BF0517,Bhakti Vaghmare,Heart Disease,34.05,Moderate Risk,Healthy,19-07-2026 14:24
+A89D6285,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,19-07-2026 14:35
+306EA481,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,19-07-2026 14:35
+A8DB3076,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,19-07-2026 14:37
+FEE4868C,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,19-07-2026 14:37
+5109B28A,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,19-07-2026 14:41
+2EA1C662,Pratik Patil,Diabetes,7.95,Low Risk,Healthy,19-07-2026 14:42
+02F7487B,Rajeshree Patil,Diabetes,7.55,Low Risk,Healthy,19-07-2026 14:43
+1270D766,Pratik Rajendra Patil,Heart Disease,41.31,Moderate Risk,Healthy,19-07-2026 14:43
+F768E7AD,Rajeshree Ramesh Patil,Heart Disease,38.97,Moderate Risk,Healthy,19-07-2026 14:44
+0947F35C,Pratik Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 10:40
+F2735CE1,Pratik Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 15:09
+7B094F57,Pratik Patil,Diabetes,8.43,Low Risk,Healthy,21-07-2026 15:25
+7E9C73CC,Shreya Patil,Heart Disease,63.3,Moderate Risk,Heart Disease,21-07-2026 15:26
+77235702,Shreya Patil,Heart Disease,22.93,Low Risk,Healthy,21-07-2026 15:33
+C24997EC,Shree Patil,Heart Disease,63.21,Moderate Risk,Heart Disease,21-07-2026 15:36
+D5A46AE9,Shree Patil,Heart Disease,69.91,Moderate Risk,Heart Disease,21-07-2026 15:37
+CE9CEAA9,Sudhakar Patil,Heart Disease,84.68,High Risk,Heart Disease,21-07-2026 15:38
+C5634082,Ramesh Patil,Heart Disease,63.27,Moderate Risk,Heart Disease,21-07-2026 15:43
+26E77B51,Shree Patil,Diabetes,31.69,Moderate Risk,Healthy,21-07-2026 15:46
+6A4D0C6F,Shree Patil,Heart Disease,63.3,Moderate Risk,Heart Disease,21-07-2026 20:26
+F37CC07C,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 20:27
+A7A520A9,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 21:08
+48163125,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 21:27
+6EB3078A,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 21:27
+266C69B1,Shree patil,Heart Disease,63.3,Moderate Risk,Heart Disease,21-07-2026 21:28
+0C423DC9,Shree patil,Heart Disease,63.3,Moderate Risk,Heart Disease,21-07-2026 21:29
+F6D2D96B,Shree Patil,Heart Disease,63.3,Moderate Risk,Heart Disease,21-07-2026 21:50
+2EED3FC8,Shree Patil,Heart Disease,63.3,Moderate Risk,Heart Disease,21-07-2026 21:57
+650FB705,Shree Patil,Heart Disease,63.3,Moderate Risk,Heart Disease,21-07-2026 21:58
+A12CBD4D,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 22:09
+04599E6D,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 22:23
+D0DDE515,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 22:24
+43A83C6E,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 22:30
+954E1ECB,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 22:36
+DEDC4D28,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 22:37
+87402604,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 22:42
+2158DBC8,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 22:43
+8D4A0EAF,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 22:57
+75A235A2,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 23:11
+44C2E9DF,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 23:13
+DF28B542,,Diabetes,8.57,Low Risk,Healthy,21-07-2026 23:17
+D16BD3EF,Shree Patil,Diabetes,8.57,Low Risk,Healthy,21-07-2026 23:21
+F8FE550C,Sunil Patil,Heart Disease,63.3,Moderate Risk,Heart Disease,23-07-2026 15:21
+453D66C4,Sunil Patil,Heart Disease,63.3,Moderate Risk,Heart Disease,23-07-2026 15:21
+6B1BBC90,sugandha patil,Diabetes,23.43,Low Risk,Healthy,23-07-2026 15:24
+A8C5967B,Sunil Patil,Diabetes,8.57,Low Risk,Healthy,24-07-2026 10:16
