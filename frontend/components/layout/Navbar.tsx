@@ -65,8 +65,9 @@ export default function Navbar({
 
   const publicNavLinks = [
     { name: "Home", href: "/#home" },
-    { name: "About", href: "/#why-us" },
+    { name: "About", href: "/#about" },
     { name: "How It Works", href: "/#how-it-works" },
+    { name: "Features", href: "/#features" },
     { name: "Health Assessment", href: "/#predictions" },
     { name: "FAQ", href: "/#faq" },
   ];

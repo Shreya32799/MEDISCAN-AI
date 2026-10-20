@@ -47,7 +47,7 @@ export default function FAQ() {
   };
 
   return (
-    <section id="faq" className="scroll-mt-24 py-20 bg-white relative">
+    <section id="faq" className="scroll-mt-28 py-20 bg-white relative">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}

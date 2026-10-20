@@ -14,7 +14,9 @@ import {
 
 export default function About() {
   return (
-    <section id="why-us" className="scroll-mt-24 py-20 bg-slate-50 relative overflow-hidden">
+    <section id="about" className="scroll-mt-28 py-20 bg-slate-50 relative overflow-hidden">
+      {/* Anchor alias for why-us */}
+      <span id="why-us" className="scroll-mt-28 absolute top-0" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}

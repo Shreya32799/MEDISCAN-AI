@@ -86,7 +86,7 @@ export default function Footer({
             </h4>
             <ul className="space-y-2.5 text-xs text-slate-400 font-medium">
               <li>
-                <Link href="/#why-us" className="hover:text-teal-400 transition-colors">
+                <Link href="/#about" className="hover:text-teal-400 transition-colors">
                   About MediScan-AI
                 </Link>
               </li>

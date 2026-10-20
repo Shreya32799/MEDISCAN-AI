@@ -48,7 +48,7 @@ interface HowItWorksProps {
 
 export default function HowItWorks({ onStartAssessment }: HowItWorksProps) {
   return (
-    <section id="how-it-works" className="scroll-mt-24 py-20 bg-slate-50 relative overflow-hidden">
+    <section id="how-it-works" className="scroll-mt-28 py-20 bg-slate-50 relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}

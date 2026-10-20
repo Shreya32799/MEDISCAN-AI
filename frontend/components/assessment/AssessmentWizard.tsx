@@ -24,11 +24,13 @@ import {
   Edit2,
   AlertOctagon,
   LayoutDashboard,
+  HelpCircle,
 } from "lucide-react";
 import { DiseaseType, PredictionResult } from "./PredictionModal";
 import { exportHealthReportPDF, generateReportId, PDFReportData } from "@/lib/pdfGenerator";
 import { AssessmentContext } from "@/app/api/chat/route";
 import { useAuth } from "@/context/AuthContext";
+import DashboardOverlayModal from "@/components/dashboard/DashboardOverlayModal";
 import Link from "next/link";
 
 interface AssessmentWizardProps {
@@ -41,7 +43,7 @@ const HEART_DEFAULTS = {
   patient_name: "Alex Morgan",
   age: 45,
   sex: "Male",
-  dataset: 0,
+  dataset: 0, // Cleveland Clinic standard calibration (kept silently for model requirement)
   cp: "typical angina",
   trestbps: 120,
   chol: 200,
@@ -127,17 +129,66 @@ const PRESETS = {
 const STEPS = [
   { id: 1, name: "Demographics", icon: User },
   { id: 2, name: "Vitals & Labs", icon: ActivitySquare },
-  { id: 3, name: "Specialized Metrics", icon: Stethoscope },
+  { id: 3, name: "Specialized Tests", icon: Stethoscope },
   { id: 4, name: "Review", icon: CheckCircle2 },
-  { id: 5, name: "AI Screening Result", icon: Sparkles },
+  { id: 5, name: "Screening Result", icon: Sparkles },
 ];
+
+/**
+ * Accessible Info Tooltip / Helper Dialog Trigger
+ */
+function FieldHelper({
+  title,
+  description,
+  range,
+  tip,
+}: {
+  title: string;
+  description: string;
+  range?: string;
+  tip?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative inline-block ml-1.5 align-middle">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        className="p-0.5 rounded-full text-slate-400 hover:text-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
+        aria-label={`Info about ${title}`}
+      >
+        <HelpCircle className="w-3.5 h-3.5" />
+      </button>
+
+      {open && (
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 w-64 p-3 bg-slate-900 text-white rounded-xl shadow-xl text-left border border-slate-700 animate-in fade-in duration-150">
+          <p className="font-bold text-xs text-sky-300 mb-1">{title}</p>
+          <p className="text-[11px] text-slate-300 leading-relaxed mb-1.5">{description}</p>
+          {range && (
+            <p className="text-[10px] text-emerald-300 font-semibold mb-1">
+              Healthy Target: <span className="text-white">{range}</span>
+            </p>
+          )}
+          {tip && (
+            <p className="text-[10px] text-slate-400 italic border-t border-slate-800 pt-1">
+              Note: {tip}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AssessmentWizard({
   initialDisease = "heart",
   onOpenChatbotWithContext,
   onCompletePrediction,
 }: AssessmentWizardProps) {
-  const { user, saveAssessment } = useAuth();
+  const { user, saveAssessment, getAssessments } = useAuth();
 
   const [disease, setDisease] = useState<DiseaseType>(initialDisease);
   const [currentStep, setCurrentStep] = useState(1);
@@ -154,6 +205,9 @@ export default function AssessmentWizard({
   const [currentReportId, setCurrentReportId] = useState<string>(generateReportId());
   const [errorText, setErrorText] = useState<string | null>(null);
   const [savedStatus, setSavedStatus] = useState<boolean>(false);
+  const [showDashboardOverlay, setShowDashboardOverlay] = useState<boolean>(false);
+
+  const userHistory = getAssessments("all");
 
   const loadPreset = (type: "lowRisk" | "highRisk") => {
     setErrorText(null);
@@ -187,7 +241,7 @@ export default function AssessmentWizard({
       });
 
       if (!res.ok) {
-        throw new Error("Prediction API encountered an issue. Falling back to internal engine.");
+        throw new Error("Prediction API encountered an issue. Please try again.");
       }
 
       const data: PredictionResult = await res.json();
@@ -200,20 +254,19 @@ export default function AssessmentWizard({
       saveAssessment(data, payload, payload.patient_name);
       setSavedStatus(true);
 
-      const ctx: AssessmentContext = {
-        disease: data.disease,
-        probability: data.probability_percentage,
-        riskLevel: data.risk_level,
-        summary: data.summary,
-        parameters: payload,
-        patientName: payload.patient_name,
-      };
-
       if (onCompletePrediction) {
+        const ctx: AssessmentContext = {
+          disease: data.disease,
+          probability: data.probability_percentage,
+          riskLevel: data.risk_level,
+          summary: data.summary,
+          parameters: payload,
+          patientName: payload.patient_name,
+        };
         onCompletePrediction(data, ctx);
       }
     } catch (err: any) {
-      setErrorText(err.message || "Failed to complete prediction. Please verify inputs.");
+      setErrorText(err.message || "Failed to process prediction. Please verify inputs.");
     } finally {
       setIsLoading(false);
     }
@@ -230,26 +283,25 @@ export default function AssessmentWizard({
     if (isHeart) {
       parameterList = [
         { label: "Resting Blood Pressure", value: heartData.trestbps, unit: "mmHg", reference: "Normal: 90 - 120 mmHg" },
-        { label: "Serum Cholesterol", value: heartData.chol, unit: "mg/dL", reference: "Desirable: < 200 mg/dL" },
-        { label: "Chest Pain Presentation", value: heartData.cp, unit: "Type", reference: "Typical, Atypical, Non-Anginal, Asymptomatic" },
-        { label: "Fasting Blood Sugar > 120", value: heartData.fbs ? "Yes" : "No", unit: "Binary", reference: "Normal Fasting: < 100 mg/dL" },
-        { label: "Resting ECG Waveform", value: heartData.restecg, unit: "Pattern", reference: "Normal / ST-T Abnormality / LVH" },
-        { label: "Max Heart Rate (thalch)", value: heartData.thalch, unit: "bpm", reference: "Age-predicted maximum" },
-        { label: "Exercise-Induced Angina", value: heartData.exang ? "Yes" : "No", unit: "Binary", reference: "Exertional chest discomfort" },
-        { label: "ST Depression (oldpeak)", value: heartData.oldpeak, unit: "mm", reference: "Normal exercise shift: < 1.0" },
-        { label: "ST Segment Slope", value: heartData.slope, unit: "Pattern", reference: "Upsloping, Flat, Downsloping" },
+        { label: "Total Serum Cholesterol", value: heartData.chol, unit: "mg/dL", reference: "Desirable: < 200 mg/dL" },
+        { label: "Chest Discomfort Type", value: heartData.cp, unit: "Type", reference: "Typical, Atypical, Non-Anginal, Asymptomatic" },
+        { label: "Fasting Blood Sugar > 120", value: heartData.fbs ? "Yes (Elevated)" : "No (Normal)", unit: "Indicator", reference: "Fasting normal: ≤ 120 mg/dL" },
+        { label: "Resting ECG Result", value: heartData.restecg, unit: "Pattern", reference: "Normal / ST-T Abnormality / LVH" },
+        { label: "Maximum Exercise Heart Rate", value: heartData.thalch, unit: "bpm", reference: "Treadmill stress test peak" },
+        { label: "Exercise-Induced Discomfort", value: heartData.exang ? "Yes" : "No", unit: "Symptom", reference: "Exertional chest discomfort" },
+        { label: "Exercise ECG Shift (ST Dep.)", value: heartData.oldpeak, unit: "mm", reference: "Normal stress shift: < 1.0 mm" },
+        { label: "Exercise ECG Slope", value: heartData.slope, unit: "Slope", reference: "Upsloping / Flat / Downsloping" },
         { label: "Age at Assessment", value: heartData.age, unit: "Yrs", reference: "Cardiovascular baseline" },
-        { label: "Biological Sex", value: heartData.sex, unit: "Sex", reference: "Physiological baseline" },
       ];
     } else {
       parameterList = [
         { label: "Fasting Plasma Glucose", value: diabetesData.glucose, unit: "mg/dL", reference: "Normal Fasting: 70 - 99 mg/dL" },
-        { label: "Body Mass Index (BMI)", value: diabetesData.bmi, unit: "kg/m²", reference: "Normal: 18.5 - 24.9 kg/m²" },
         { label: "Diastolic Blood Pressure", value: diabetesData.blood_pressure, unit: "mmHg", reference: "Normal: 60 - 80 mmHg" },
-        { label: "2-Hour Serum Insulin", value: diabetesData.insulin, unit: "µU/mL", reference: "Normal Fasting: 16 - 166 µU/mL" },
-        { label: "Triceps Skinfold Thickness", value: diabetesData.skin_thickness, unit: "mm", reference: "Subcutaneous fat proxy" },
-        { label: "Diabetes Pedigree Function", value: diabetesData.diabetes_pedigree_function, unit: "DPF", reference: "Genetic risk score" },
-        { label: "Number of Pregnancies", value: diabetesData.pregnancies, unit: "Count", reference: "Gestational history" },
+        { label: "Body Mass Index (BMI)", value: diabetesData.bmi, unit: "kg/m²", reference: "Healthy: 18.5 - 24.9 kg/m²" },
+        { label: "Serum Insulin (2-Hour Test)", value: diabetesData.insulin, unit: "µU/mL", reference: "Fasting normal: 16 - 166 µU/mL" },
+        { label: "Skinfold Thickness", value: diabetesData.skin_thickness, unit: "mm", reference: "Subcutaneous fat proxy" },
+        { label: "Family Diabetes History Score", value: diabetesData.diabetes_pedigree_function, unit: "DPF", reference: "Genetic risk score" },
+        { label: "Number of Past Pregnancies", value: diabetesData.pregnancies, unit: "Count", reference: "Gestational history" },
         { label: "Age at Assessment", value: diabetesData.age, unit: "Yrs", reference: "Metabolic risk trajectory" },
       ];
     }
@@ -294,7 +346,7 @@ export default function AssessmentWizard({
       <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2.5 text-xs text-amber-900 flex items-center gap-2">
         <AlertOctagon className="w-4 h-4 text-amber-600 shrink-0" />
         <span className="font-medium leading-tight">
-          <strong>Medical Safety Notice:</strong> This tool is not intended for emergencies. If you are experiencing severe or concerning symptoms, seek immediate medical assistance rather than relying on an AI screening result.
+          <strong>Medical Safety Notice:</strong> This tool is intended for screening and educational decision support. If you are experiencing chest pain, severe shortness of breath, or emergency symptoms, seek immediate professional medical attention.
         </span>
       </div>
 
@@ -414,7 +466,7 @@ export default function AssessmentWizard({
       {/* Main Step Content */}
       <div className="p-6 sm:p-8">
         <AnimatePresence mode="wait">
-          {/* STEP 1: Basic Information */}
+          {/* STEP 1: Demographic Information */}
           {currentStep === 1 && (
             <motion.div
               key="step-1"
@@ -424,15 +476,19 @@ export default function AssessmentWizard({
               className="space-y-6"
             >
               <div className="border-b border-slate-100 pb-4">
-                <h3 className="text-lg font-bold text-slate-900">Step 1: Patient / Demographic Information</h3>
+                <h3 className="text-lg font-bold text-slate-900">Step 1: Patient & Demographic Information</h3>
                 <p className="text-xs text-slate-500">Provide basic demographic parameters used as baseline factors in screening models.</p>
               </div>
 
               {disease === "heart" ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                  <div className="sm:col-span-1">
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Patient / Subject Name
+                      <FieldHelper
+                        title="Patient / Subject Name"
+                        description="Used for personalizing your digital screening report and PDF export."
+                      />
                     </label>
                     <p className="text-[11px] text-slate-400 mb-1.5">For report labeling.</p>
                     <input
@@ -444,9 +500,14 @@ export default function AssessmentWizard({
                     />
                   </div>
 
-                  <div>
+                  <div className="sm:col-span-1">
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Age (18 - 100 Years)
+                      <FieldHelper
+                        title="Age"
+                        description="Your current age. Age is an important biological baseline for cardiovascular risk estimation."
+                        range="18 - 100 Years"
+                      />
                     </label>
                     <p className="text-[11px] text-slate-400 mb-1.5">Cardiovascular risk scales with age.</p>
                     <input
@@ -459,11 +520,15 @@ export default function AssessmentWizard({
                     />
                   </div>
 
-                  <div>
+                  <div className="sm:col-span-1">
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Biological Sex
+                      <FieldHelper
+                        title="Biological Sex"
+                        description="Biological sex at birth, used for baseline physiological and hormonal calibration in clinical models."
+                      />
                     </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">Hormonal and clinical baseline.</p>
+                    <p className="text-[11px] text-slate-400 mb-1.5">Baseline hormonal and clinical profile.</p>
                     <select
                       value={heartData.sex}
                       onChange={(e) => setHeartData({ ...heartData, sex: e.target.value })}
@@ -473,29 +538,16 @@ export default function AssessmentWizard({
                       <option value="Female">Female</option>
                     </select>
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Hospital Dataset / Cohort Calibration
-                    </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">Benchmark clinical trial center.</p>
-                    <select
-                      value={heartData.dataset}
-                      onChange={(e) => setHeartData({ ...heartData, dataset: Number(e.target.value) })}
-                      className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
-                    >
-                      <option value={0}>Cleveland Clinic (Standard Benchmark)</option>
-                      <option value={1}>Hungarian Cardiology Center</option>
-                      <option value={2}>Switzerland University Hospital</option>
-                      <option value={3}>VA Long Beach Medical Center</option>
-                    </select>
-                  </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Patient / Subject Name
+                      <FieldHelper
+                        title="Patient / Subject Name"
+                        description="Used for personalizing your digital screening report and PDF export."
+                      />
                     </label>
                     <p className="text-[11px] text-slate-400 mb-1.5">For report labeling.</p>
                     <input
@@ -503,12 +555,18 @@ export default function AssessmentWizard({
                       value={diabetesData.patient_name}
                       onChange={(e) => setDiabetesData({ ...diabetesData, patient_name: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
+                      placeholder="e.g. Emma Watson"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Age (1 - 120 Years)
+                      <FieldHelper
+                        title="Age"
+                        description="Your current age in years."
+                        range="18 - 80 Typical"
+                      />
                     </label>
                     <p className="text-[11px] text-slate-400 mb-1.5">Metabolic baseline.</p>
                     <input
@@ -523,7 +581,12 @@ export default function AssessmentWizard({
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Number of Pregnancies
+                      Number of Past Pregnancies
+                      <FieldHelper
+                        title="Pregnancies"
+                        description="Pregnancy hormones can influence lifetime metabolic and insulin sensitivity. Enter 0 for male subjects or individuals who have never been pregnant."
+                        range="0 if male or none"
+                      />
                     </label>
                     <p className="text-[11px] text-slate-400 mb-1.5">Gestational metabolic history (0 if male/none).</p>
                     <input
@@ -551,16 +614,22 @@ export default function AssessmentWizard({
             >
               <div className="border-b border-slate-100 pb-4">
                 <h3 className="text-lg font-bold text-slate-900">Step 2: Vitals & Primary Laboratory Biomarkers</h3>
-                <p className="text-xs text-slate-500">Standard clinical readings obtained from routine medical checkups.</p>
+                <p className="text-xs text-slate-500">Standard clinical readings obtained from routine medical checkups or home monitors.</p>
               </div>
 
               {disease === "heart" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Resting Blood Pressure (trestbps) in mmHg
+                      Resting Blood Pressure (Systolic)
+                      <FieldHelper
+                        title="Resting Blood Pressure (Systolic)"
+                        description="Your blood pressure while resting, usually measured during a routine checkup. This is the top (higher) number on a blood pressure reading."
+                        range="90 - 120 mmHg"
+                        tip="If you don't know your exact number, 120 mmHg is standard normal."
+                      />
                     </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">Systolic pressure at rest (Normal: 90 - 120 mmHg).</p>
+                    <p className="text-[11px] text-slate-400 mb-1.5">Measured in mmHg (Normal: 90 - 120 mmHg).</p>
                     <input
                       type="number"
                       min="80"
@@ -568,14 +637,21 @@ export default function AssessmentWizard({
                       value={heartData.trestbps}
                       onChange={(e) => setHeartData({ ...heartData, trestbps: Number(e.target.value) })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
+                      placeholder="120"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Serum Cholesterol (chol) in mg/dL
+                      Total Blood Cholesterol
+                      <FieldHelper
+                        title="Total Blood Cholesterol"
+                        description="The total amount of cholesterol measured in your blood test (lipid panel)."
+                        range="< 200 mg/dL"
+                        tip="Below 200 mg/dL is desirable; 200-239 is borderline; 240+ is elevated."
+                      />
                     </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">Total lipid concentration (Desirable: &lt; 200 mg/dL).</p>
+                    <p className="text-[11px] text-slate-400 mb-1.5">Measured in mg/dL (Desirable: &lt; 200 mg/dL).</p>
                     <input
                       type="number"
                       min="100"
@@ -583,12 +659,18 @@ export default function AssessmentWizard({
                       value={heartData.chol}
                       onChange={(e) => setHeartData({ ...heartData, chol: Number(e.target.value) })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
+                      placeholder="200"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Chest Pain Type (cp)
+                      Chest Discomfort Type
+                      <FieldHelper
+                        title="Chest Discomfort Type"
+                        description="Asks about the type of chest sensation or discomfort experienced, if any. Angina refers to chest tightness caused by reduced blood flow to heart muscle."
+                        tip="Choose 'No Chest Discomfort' if you do not experience chest symptoms."
+                      />
                     </label>
                     <p className="text-[11px] text-slate-400 mb-1.5">Primary symptomatic presentation.</p>
                     <select
@@ -596,16 +678,22 @@ export default function AssessmentWizard({
                       onChange={(e) => setHeartData({ ...heartData, cp: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
                     >
-                      <option value="typical angina">Typical Angina (Exertional Pressure)</option>
-                      <option value="atypical angina">Atypical Angina</option>
-                      <option value="non-anginal">Non-anginal Chest Discomfort</option>
-                      <option value="asymptomatic">Asymptomatic (No Angina)</option>
+                      <option value="asymptomatic">No Chest Discomfort (Asymptomatic)</option>
+                      <option value="typical angina">Exertional Discomfort (Tightness during physical activity)</option>
+                      <option value="atypical angina">Atypical Discomfort (Short twinges not linked to exertion)</option>
+                      <option value="non-anginal">Non-Cardiac Discomfort (e.g. muscle strain or reflux)</option>
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Fasting Blood Sugar &gt; 120 mg/dL? (fbs)
+                      Fasting Blood Sugar &gt; 120 mg/dL?
+                      <FieldHelper
+                        title="Fasting Blood Sugar"
+                        description="Refers to a blood glucose measurement taken after fasting (8+ hours without food)."
+                        range="≤ 120 mg/dL Normal"
+                        tip="If you have not been diagnosed with diabetes or high blood sugar, select 'No'."
+                      />
                     </label>
                     <p className="text-[11px] text-slate-400 mb-1.5">Elevated fasting blood sugar indicator.</p>
                     <select
@@ -613,18 +701,24 @@ export default function AssessmentWizard({
                       onChange={(e) => setHeartData({ ...heartData, fbs: e.target.value === "true" })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
                     >
-                      <option value="false">No (&le; 120 mg/dL - Normal)</option>
-                      <option value="true">Yes (&gt; 120 mg/dL - Elevated)</option>
+                      <option value="false">No (120 mg/dL or below — Normal)</option>
+                      <option value="true">Yes (above 120 mg/dL — Elevated / Diabetes)</option>
                     </select>
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Fasting Plasma Glucose (mg/dL)
+                      Fasting Blood Glucose
+                      <FieldHelper
+                        title="Fasting Blood Glucose"
+                        description="Your blood sugar level measured after an overnight fast (8+ hours)."
+                        range="70 - 99 mg/dL"
+                        tip="100 - 125 mg/dL is pre-diabetic; 126+ indicates diabetes."
+                      />
                     </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">Blood sugar level after 8h fast (Normal: 70 - 99 mg/dL).</p>
+                    <p className="text-[11px] text-slate-400 mb-1.5">Measured in mg/dL (Normal: 70 - 99 mg/dL).</p>
                     <input
                       type="number"
                       min="40"
@@ -632,14 +726,21 @@ export default function AssessmentWizard({
                       value={diabetesData.glucose}
                       onChange={(e) => setDiabetesData({ ...diabetesData, glucose: Number(e.target.value) })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
+                      placeholder="100"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Diastolic Blood Pressure (mmHg)
+                      Diastolic Blood Pressure (Resting)
+                      <FieldHelper
+                        title="Diastolic Blood Pressure"
+                        description="The bottom (lower) number from a blood pressure reading."
+                        range="60 - 80 mmHg"
+                        tip="For example, in '120/80 mmHg', 80 is your diastolic pressure."
+                      />
                     </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">Lower blood pressure reading (Normal: 60 - 80 mmHg).</p>
+                    <p className="text-[11px] text-slate-400 mb-1.5">Lower BP reading in mmHg (Normal: 60 - 80).</p>
                     <input
                       type="number"
                       min="40"
@@ -647,12 +748,19 @@ export default function AssessmentWizard({
                       value={diabetesData.blood_pressure}
                       onChange={(e) => setDiabetesData({ ...diabetesData, blood_pressure: Number(e.target.value) })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
+                      placeholder="72"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Body Mass Index (BMI in kg/m²)
+                      Body Mass Index (BMI)
+                      <FieldHelper
+                        title="Body Mass Index (BMI)"
+                        description="A standard ratio measuring body weight relative to height (kg/m²)."
+                        range="18.5 - 24.9 kg/m²"
+                        tip="Underweight: < 18.5 | Normal: 18.5-24.9 | Overweight: 25-29.9 | Obese: 30+"
+                      />
                     </label>
                     <p className="text-[11px] text-slate-400 mb-1.5">Weight (kg) / Height (m)² (Normal: 18.5 - 24.9).</p>
                     <input
@@ -663,6 +771,7 @@ export default function AssessmentWizard({
                       value={diabetesData.bmi}
                       onChange={(e) => setDiabetesData({ ...diabetesData, bmi: Number(e.target.value) })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
+                      placeholder="24.5"
                     />
                   </div>
                 </div>
@@ -670,7 +779,7 @@ export default function AssessmentWizard({
             </motion.div>
           )}
 
-          {/* STEP 3: Specialized Indicators */}
+          {/* STEP 3: Diagnostic & Specialized Indicators */}
           {currentStep === 3 && (
             <motion.div
               key="step-3"
@@ -681,16 +790,22 @@ export default function AssessmentWizard({
             >
               <div className="border-b border-slate-100 pb-4">
                 <h3 className="text-lg font-bold text-slate-900">Step 3: Diagnostic & Specialized Indicators</h3>
-                <p className="text-xs text-slate-500">Parameters obtained from ECGs, stress tests, or metabolic laboratory profiles.</p>
+                <p className="text-xs text-slate-500">Parameters obtained from ECG stress test reports or specialized metabolic blood tests.</p>
               </div>
 
               {disease === "heart" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Maximum Heart Rate Achieved (thalch in bpm)
+                      Maximum Heart Rate During Exercise
+                      <FieldHelper
+                        title="Max Heart Rate During Exercise"
+                        description="The highest pulse recorded during an exercise or treadmill stress test."
+                        range="140 - 180 bpm"
+                        tip="Estimated peak is roughly 220 minus age. If you haven't taken a treadmill test, 150 bpm is standard average."
+                      />
                     </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">Peak rate reached during treadmill stress test (50 - 250 bpm).</p>
+                    <p className="text-[11px] text-slate-400 mb-1.5">Peak rate reached during stress test (bpm).</p>
                     <input
                       type="number"
                       min="50"
@@ -698,14 +813,41 @@ export default function AssessmentWizard({
                       value={heartData.thalch}
                       onChange={(e) => setHeartData({ ...heartData, thalch: Number(e.target.value) })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
+                      placeholder="150"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      ST Depression (oldpeak in mm: 0.0 - 10.0)
+                      Chest Discomfort During Physical Exertion?
+                      <FieldHelper
+                        title="Exercise-Induced Chest Discomfort"
+                        description="Asks whether chest tightness, pain, or discomfort occurs when walking briskly, running, or climbing stairs."
+                        tip="If you can engage in physical activity without chest pain, choose 'No'."
+                      />
                     </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">ECG ST segment difference induced by exercise vs rest.</p>
+                    <p className="text-[11px] text-slate-400 mb-1.5">Exertional chest symptom indicator.</p>
+                    <select
+                      value={heartData.exang ? "true" : "false"}
+                      onChange={(e) => setHeartData({ ...heartData, exang: e.target.value === "true" })}
+                      className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
+                    >
+                      <option value="false">No (Physical activity does not cause discomfort)</option>
+                      <option value="true">Yes (Chest tightness occurs during exertion)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Exercise ECG Shift (ST Depression in mm)
+                      <FieldHelper
+                        title="Exercise ST Depression"
+                        description="A measurement from an exercise ECG test that must be obtained from a medical report. Do not guess."
+                        range="0.0 - 1.0 mm Normal"
+                        tip="Measures oxygenation recovery. If you have not had an abnormal stress test, enter 0.0."
+                      />
+                    </label>
+                    <p className="text-[11px] text-slate-400 mb-1.5">ECG shift induced by exercise (Normal: 0.0 - 1.0 mm).</p>
                     <input
                       type="number"
                       step="0.1"
@@ -714,63 +856,67 @@ export default function AssessmentWizard({
                       value={heartData.oldpeak}
                       onChange={(e) => setHeartData({ ...heartData, oldpeak: Number(e.target.value) })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
+                      placeholder="0.0"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Slope of Peak Exercise ST Segment
+                      Exercise ECG Waveform (ST Slope)
+                      <FieldHelper
+                        title="Exercise ECG Pattern (Slope)"
+                        description="A finding interpreted from an exercise ECG report describing the electrical wave angle after peak exercise."
+                        range="Upsloping is Typical Normal"
+                        tip="Upsloping is the normal healthy heart response to exercise."
+                      />
                     </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">Treadmill stress test ST waveform angle.</p>
+                    <p className="text-[11px] text-slate-400 mb-1.5">Stress test ST waveform angle.</p>
                     <select
                       value={heartData.slope}
                       onChange={(e) => setHeartData({ ...heartData, slope: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
                     >
-                      <option value="upsloping">Upsloping (Typically Normal)</option>
-                      <option value="flat">Flat (Potential Ischemia)</option>
-                      <option value="downsloping">Downsloping (High Risk Indicator)</option>
+                      <option value="upsloping">Upsloping Wave (Normal healthy heart response)</option>
+                      <option value="flat">Flat Wave (Moderate strain indicator)</option>
+                      <option value="downsloping">Downsloping Wave (Elevated cardiac strain)</option>
                     </select>
                   </div>
 
-                  <div>
+                  <div className="sm:col-span-2">
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Resting ECG Result
+                      <FieldHelper
+                        title="Resting ECG Result"
+                        description="The interpretation of an electrocardiogram (ECG / EKG) performed at rest while lying down."
+                        range="Normal Baseline"
+                        tip="If you have never had an abnormal ECG result, select 'Normal Resting ECG'."
+                      />
                     </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">12-lead baseline findings.</p>
+                    <p className="text-[11px] text-slate-400 mb-1.5">12-lead baseline findings at rest.</p>
                     <select
                       value={heartData.restecg}
                       onChange={(e) => setHeartData({ ...heartData, restecg: e.target.value })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
                     >
-                      <option value="normal">Normal Baseline ECG</option>
-                      <option value="st-t abnormality">ST-T Wave Abnormality</option>
-                      <option value="lv hypertrophy">Left Ventricular Hypertrophy (LVH)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Exercise-Induced Angina (exang)
-                    </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">Chest discomfort triggered during exertion.</p>
-                    <select
-                      value={heartData.exang ? "true" : "false"}
-                      onChange={(e) => setHeartData({ ...heartData, exang: e.target.value === "true" })}
-                      className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
-                    >
-                      <option value="false">No</option>
-                      <option value="true">Yes</option>
+                      <option value="normal">Normal Resting ECG (No abnormalities found)</option>
+                      <option value="st-t abnormality">ST-T Wave Changes (Minor electrical recovery variation)</option>
+                      <option value="lv hypertrophy">Left Ventricular Hypertrophy (Thickened heart wall)</option>
                     </select>
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Triceps Skinfold Thickness (mm)
+                      Skinfold Thickness (Body Fat Proxy)
+                      <FieldHelper
+                        title="Skinfold Thickness"
+                        description="A clinical caliper measurement of subcutaneous arm fat (mm)."
+                        range="15 - 25 mm Typical"
+                        tip="If this was not measured during a checkup, keep the standard clinical average of 20 mm."
+                      />
                     </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">Subcutaneous fat measure (Default: 20 mm if unknown).</p>
+                    <p className="text-[11px] text-slate-400 mb-1.5">Triceps caliper fat proxy (Default: 20 mm if unknown).</p>
                     <input
                       type="number"
                       min="0"
@@ -778,14 +924,21 @@ export default function AssessmentWizard({
                       value={diabetesData.skin_thickness}
                       onChange={(e) => setDiabetesData({ ...diabetesData, skin_thickness: Number(e.target.value) })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
+                      placeholder="20"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      2-Hour Serum Insulin (µU/mL)
+                      Serum Insulin (2-Hour Test)
+                      <FieldHelper
+                        title="Serum Insulin"
+                        description="Insulin measured in blood 2 hours after a standardized glucose test."
+                        range="16 - 166 µU/mL"
+                        tip="If you have not taken a formal oral glucose test, keep the standard average of 85 µU/mL."
+                      />
                     </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">Insulin response test (Normal fasting: 16 - 166 µU/mL).</p>
+                    <p className="text-[11px] text-slate-400 mb-1.5">Measured in µU/mL (Normal fasting: 16 - 166).</p>
                     <input
                       type="number"
                       min="0"
@@ -793,14 +946,21 @@ export default function AssessmentWizard({
                       value={diabetesData.insulin}
                       onChange={(e) => setDiabetesData({ ...diabetesData, insulin: Number(e.target.value) })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
+                      placeholder="85"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Diabetes Pedigree Function (DPF: 0.0 - 3.0)
+                      Family Diabetes History Score
+                      <FieldHelper
+                        title="Family Diabetes History Score (DPF)"
+                        description="A clinical genetic lineage score estimating family history: 0.1-0.3 = No known family diabetes | 0.3-0.6 = One parent or grandparent | 0.6-1.2+ = Multiple close family members."
+                        range="0.1 - 1.2 Score"
+                        tip="Population average baseline is ~0.45."
+                      />
                     </label>
-                    <p className="text-[11px] text-slate-400 mb-1.5">Scores genetic lineage risk (Baseline average: ~0.47).</p>
+                    <p className="text-[11px] text-slate-400 mb-1.5">Family lineage score (Baseline average: ~0.45).</p>
                     <input
                       type="number"
                       step="0.01"
@@ -809,6 +969,7 @@ export default function AssessmentWizard({
                       value={diabetesData.diabetes_pedigree_function}
                       onChange={(e) => setDiabetesData({ ...diabetesData, diabetes_pedigree_function: Number(e.target.value) })}
                       className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-sky-500 text-slate-900 font-medium"
+                      placeholder="0.45"
                     />
                   </div>
                 </div>
@@ -828,7 +989,7 @@ export default function AssessmentWizard({
               <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">Step 4: Review Clinical Parameters</h3>
-                  <p className="text-xs text-slate-500">Confirm entered values before passing to the Random Forest model.</p>
+                  <p className="text-xs text-slate-500">Confirm your entered values before passing to the Random Forest model.</p>
                 </div>
                 <button
                   onClick={() => setCurrentStep(1)}
@@ -852,27 +1013,27 @@ export default function AssessmentWizard({
                       <span className="text-sm font-bold text-slate-900">{heartData.trestbps} mmHg</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Cholesterol</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Cholesterol</span>
                       <span className="text-sm font-bold text-slate-900">{heartData.chol} mg/dL</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Chest Pain</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Chest Discomfort</span>
                       <span className="text-sm font-bold text-slate-900 capitalize truncate block">{heartData.cp}</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Max Heart Rate</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Max Exercise Rate</span>
                       <span className="text-sm font-bold text-slate-900">{heartData.thalch} bpm</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">ST Depression</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">ST Shift (ECG)</span>
                       <span className="text-sm font-bold text-slate-900">{heartData.oldpeak} mm</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">ST Slope</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">ECG Wave Slope</span>
                       <span className="text-sm font-bold text-slate-900 capitalize">{heartData.slope}</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Ex. Angina</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Exertion Angina</span>
                       <span className="text-sm font-bold text-slate-900">{heartData.exang ? "Yes" : "No"}</span>
                     </div>
                   </>
@@ -883,27 +1044,27 @@ export default function AssessmentWizard({
                       <span className="text-sm font-bold text-slate-900">{diabetesData.age} Yrs</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Glucose</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Fasting Glucose</span>
                       <span className="text-sm font-bold text-slate-900">{diabetesData.glucose} mg/dL</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Diastolic BP</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Diastolic Pressure</span>
                       <span className="text-sm font-bold text-slate-900">{diabetesData.blood_pressure} mmHg</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">BMI</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Body Mass Index</span>
                       <span className="text-sm font-bold text-slate-900">{diabetesData.bmi} kg/m²</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Insulin</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Serum Insulin</span>
                       <span className="text-sm font-bold text-slate-900">{diabetesData.insulin} µU/mL</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Skinfold</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Skinfold Thickness</span>
                       <span className="text-sm font-bold text-slate-900">{diabetesData.skin_thickness} mm</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Pedigree (DPF)</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Family History (DPF)</span>
                       <span className="text-sm font-bold text-slate-900">{diabetesData.diabetes_pedigree_function}</span>
                     </div>
                     <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
@@ -916,7 +1077,7 @@ export default function AssessmentWizard({
 
               <div className="p-4 bg-sky-50 rounded-2xl border border-sky-100 flex items-center gap-3 text-xs text-sky-900">
                 <ShieldCheck className="w-5 h-5 text-sky-600 shrink-0" />
-                <span>Values are ready. Clicking below executes real inference through the trained Random Forest pipeline.</span>
+                <span>All parameters validated. Clicking below passes your vitals to the calibrated Scikit-Learn Random Forest pipeline.</span>
               </div>
             </motion.div>
           )}
@@ -945,7 +1106,7 @@ export default function AssessmentWizard({
                   <span>Date: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</span>
                   {savedStatus && (
                     <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-bold block mt-0.5">
-                      <Check className="w-3 h-3" /> Saved to User Dashboard
+                      <Check className="w-3 h-3" /> Recorded in Session Dashboard
                     </span>
                   )}
                 </div>
@@ -964,7 +1125,7 @@ export default function AssessmentWizard({
                 <div className="space-y-3 flex-1 text-center md:text-left">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-slate-200 text-xs font-bold shadow-2xs">
                     <Activity className="w-3.5 h-3.5 text-sky-600" />
-                    <span>Estimated Risk Category</span>
+                    <span>Estimated Screening Risk Category</span>
                   </div>
 
                   <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
@@ -973,6 +1134,10 @@ export default function AssessmentWizard({
 
                   <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
                     {predictionResult.summary}
+                  </p>
+
+                  <p className="text-[11px] text-slate-500 italic">
+                    * This percentage reflects the machine learning model's output confidence score calibrated against clinical benchmark datasets, not a clinical diagnostic certainty.
                   </p>
                 </div>
 
@@ -1008,7 +1173,7 @@ export default function AssessmentWizard({
                     <span className="text-2xl font-black text-slate-900">
                       {predictionResult.probability_percentage}%
                     </span>
-                    <span className="text-[10px] uppercase font-bold text-slate-500">Risk Score</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-500">Model Score</span>
                   </div>
                 </div>
               </div>
@@ -1027,12 +1192,12 @@ export default function AssessmentWizard({
                         <span className="text-[10px] font-bold text-slate-400 uppercase">Resting Blood Pressure</span>
                         <div className="text-lg font-bold text-slate-900">{heartData.trestbps} mmHg</div>
                         <p className="text-[11px] text-slate-500 leading-snug">
-                          {heartData.trestbps > 130 ? "Elevated — review with physician." : "Within normal clinical range (90-120)."}
+                          {heartData.trestbps > 130 ? "Elevated — discuss with your physician." : "Within normal clinical range (90-120)."}
                         </p>
                       </div>
 
                       <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Serum Cholesterol</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Total Blood Cholesterol</span>
                         <div className="text-lg font-bold text-slate-900">{heartData.chol} mg/dL</div>
                         <p className="text-[11px] text-slate-500 leading-snug">
                           {heartData.chol > 200 ? "Borderline/elevated total lipids." : "Desirable lipid levels (< 200 mg/dL)."}
@@ -1040,10 +1205,10 @@ export default function AssessmentWizard({
                       </div>
 
                       <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Max Heart Rate</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Max Exercise Pulse</span>
                         <div className="text-lg font-bold text-slate-900">{heartData.thalch} bpm</div>
                         <p className="text-[11px] text-slate-500 leading-snug">
-                          Exercise treadmill peak rate recorded.
+                          Peak rate recorded during exertion.
                         </p>
                       </div>
                     </>
@@ -1053,7 +1218,7 @@ export default function AssessmentWizard({
                         <span className="text-[10px] font-bold text-slate-400 uppercase">Fasting Glucose</span>
                         <div className="text-lg font-bold text-slate-900">{diabetesData.glucose} mg/dL</div>
                         <p className="text-[11px] text-slate-500 leading-snug">
-                          {diabetesData.glucose > 100 ? "Above fasting baseline (70-99 mg/dL)." : "Within normal range."}
+                          {diabetesData.glucose > 100 ? "Above fasting baseline (70-99 mg/dL)." : "Within normal baseline range."}
                         </p>
                       </div>
 
@@ -1081,7 +1246,7 @@ export default function AssessmentWizard({
               <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200/90 space-y-3">
                 <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-sky-600" />
-                  <span>Recommended Lifestyle & Decision-Support Next Steps</span>
+                  <span>Recommended General Lifestyle & Decision-Support Next Steps</span>
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {predictionResult.recommendations.map((rec, i) => (
@@ -1098,7 +1263,7 @@ export default function AssessmentWizard({
                 <Info className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
                 <div>
                   <strong className="text-slate-800 block mb-0.5">Important Screening Disclaimer:</strong>
-                  AI-based risk screening — not a medical diagnosis. Consult a qualified physician regarding any health symptoms or clinical decisions.
+                  MediScan-AI is an AI-based health risk screening and educational decision-support tool. It does not provide a definitive medical diagnosis or replace a qualified healthcare professional.
                 </div>
               </div>
 
@@ -1111,6 +1276,7 @@ export default function AssessmentWizard({
                       setPredictionResult(null);
                     }}
                     className="px-4 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                    id="new-assessment-btn"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>New Assessment</span>
@@ -1127,19 +1293,20 @@ export default function AssessmentWizard({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {user && (
-                    <Link
-                      href="/dashboard"
-                      className="px-4 py-2.5 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl transition-colors flex items-center gap-1.5"
-                    >
-                      <LayoutDashboard className="w-3.5 h-3.5" />
-                      <span>View in Dashboard</span>
-                    </Link>
-                  )}
+                  {/* Fixed View in Dashboard button: Opens in-place Dashboard Overlay */}
+                  <button
+                    onClick={() => setShowDashboardOverlay(true)}
+                    className="px-4 py-2.5 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    id="view-in-dashboard-overlay-btn"
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5 text-sky-600" />
+                    <span>View in Dashboard</span>
+                  </button>
 
                   <button
                     onClick={() => window.print()}
                     className="px-3.5 py-2.5 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                    id="print-report-btn"
                   >
                     <Printer className="w-3.5 h-3.5" />
                     <span>Print</span>
@@ -1208,6 +1375,22 @@ export default function AssessmentWizard({
           </div>
         )}
       </div>
+
+      {/* Interactive In-Place Dashboard Modal Overlay */}
+      <DashboardOverlayModal
+        isOpen={showDashboardOverlay}
+        onClose={() => setShowDashboardOverlay(false)}
+        currentResult={predictionResult}
+        currentParameters={disease === "heart" ? heartData : diabetesData}
+        patientName={(disease === "heart" ? heartData : diabetesData).patient_name}
+        onDownloadPDF={handleDownloadPDF}
+        onNewAssessment={() => {
+          setCurrentStep(1);
+          setPredictionResult(null);
+          setShowDashboardOverlay(false);
+        }}
+        userHistory={userHistory}
+      />
     </div>
   );
 }

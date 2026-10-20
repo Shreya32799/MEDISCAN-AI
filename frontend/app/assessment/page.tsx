@@ -17,7 +17,10 @@ export default function AssessmentPage() {
     <main className="min-h-screen bg-slate-50 flex flex-col justify-between selection:bg-teal-100 selection:text-teal-900">
       {/* Sticky Navigation Bar */}
       <Navbar
-        onOpenAssessment={() => {}}
+        onOpenAssessment={() => {
+          const el = document.getElementById("assessment-wizard");
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+        }}
         onOpenChatbot={() => setChatbotOpen(true)}
       />
 
